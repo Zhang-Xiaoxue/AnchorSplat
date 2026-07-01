@@ -1,0 +1,163 @@
+model:
+  __object__:
+    path: depth_anything_3.model.anchorsplat_mix
+    name: AnchorSplatNet
+    args: as_params
+
+  depth_net: ~/ckpts/DA3-GIANT-1.1
+
+  feat_cnn:
+    __object__:
+      path: depth_anything_3.model.feat_cnn
+      name: FeatureCNN
+      args: as_params
+    resolution: &resolution [448, 672]  # ensure divisible by 28
+    dim_down: [64, 128, 256]
+    dim_bottleneck: [512, 256]
+    dim_out: &cnn_dim 640
+
+  anchor_sampler:
+    __object__:
+      path: depth_anything_3.model.point_sampler
+      name: ConsistentVoxelSamplerV2
+      args: as_params
+    num_points: [&num_kv 10000, 100000]  # kv size, anchor size
+    init_voxel_size: .02
+    scale_factor: 1.02
+    max_ratio: 1.05
+    max_iters: 10
+    depth_tol: .05
+    contract_scene: &contract true
+
+  point_net:
+    __object__:
+      path: depth_anything_3.model.point_net
+      name: PointBackbone
+      args: as_params
+    dim_in: *cnn_dim
+    dim: &point_net_dim 640
+    num_heads: 10
+    depth: 16
+    num_kv: *num_kv
+    num_pe_freqs: 12
+    pe_contract: *contract
+    checkpoint: false
+
+  gs_head:
+    __object__:
+      path: depth_anything_3.model.gs_head
+      name: SplitGaussianHead
+      args: as_params
+    num_gs: 4
+    sh_degree: 0
+    mlp_args:
+      dim_in: *point_net_dim
+      dim: 128
+      depth: 2
+      input_norm: true
+      activation: ReLU
+      zero_init: false
+    gs_args:
+      offset_max: 10  # number of voxels
+      opacity_bias: .1
+      scale_act: sigmoid  # softplus / sigmoid
+      scale_bias: .25  # number of voxels
+      scale_max: 2  # number of voxels
+      rotation_bias: [1., 0., 0., 0.]
+
+  refiner:
+    # __object__:
+    #   path: depth_anything_3.model.point_net
+    #   name: Refiner
+    #   args: as_params
+    # backbone:
+    #   __object__:
+    #     path: depth_anything_3.model.point_net
+    #     name: PointBackbone
+    #     args: as_params
+    #   dim_in: 529  # resnet18 512 + gs 14 + render diff 3
+    #   dim: *point_net_dim
+    #   num_heads: 10
+    #   depth: 4
+    #   num_kv: 40000  # num_kv * num_gs
+    #   num_pe_freqs: 12
+    #   pe_contract: *contract
+    #   checkpoint: true
+    # mlp:
+    #   __object__:
+    #     path: depth_anything_3.model.gs_head
+    #     name: GaussianMLP
+    #     args: as_params
+    #   dim_in: 654  # backbone 640 + gs 14
+    #   dim: 128
+    #   dim_out: 14
+    #   depth: 2
+    #   input_norm: true
+    #   activation: ReLU
+    #   zero_init: true
+
+  render_resolution: *resolution
+  num_kv: *num_kv
+
+trainer:
+  dtype: &dtype bf16
+  batch_size: 1
+  optimizer: AdamW
+  lr: 1e-4
+  epochs:
+    total: 10000
+    eval_every: 5  # save ckpt if metric is current best
+    ckpt_every: 100  # save ckpt regardless of the metric
+  steps:
+    warmup: 1000
+    vis_every: 100
+  refiner_only: false
+  loss:
+    rgb_l1: 1
+    rgb_ssim: .1
+    rgb_lpips: .1
+    rgb_nv_l1: 1
+    rgb_nv_ssim: .1
+    rgb_nv_lpips: .1
+    depth_l1: .1
+    disparity_reg_l1: 0
+    gs_scale_prod: 0
+    gs_opacity_l1: 0
+  test:
+    num_views: 32
+    nv_only: true  # only render novel views to speed up inference
+    center_crop: true
+    export_gs: false
+    warmup: false  # warm up inference with dummy batch, for time benchmark
+    render_video:
+      # radius: .5
+      num_views: 300
+      # fov_xy: [120, 80]
+
+dataset:
+  __object__:
+    path: train.dataset_mix
+    name: MixedDataset
+    args: as_params
+  datasets:
+    dl3dv:
+      type: reliev3r
+      root: ~/datasets/dl3dv-new
+      val_ratio: .001
+      weight: 1
+    re10k:
+      type: reliev3r
+      root: ~/datasets/re10k_12.19
+      val_ratio: .001
+      weight: 1
+    scannetpp:
+      type: anchorsplat
+      root: ~/datasets/anchorsplat_data/scannetppv2
+      weight: 1
+    arkit:
+      type: anchorsplat
+      root: ~/datasets/anchorsplat_data/arkitscene_0p03
+      weight: 1
+  num_views: 16  # training and eval; use trainer.test.num_views for test
+  resolution: *resolution
+  dtype: *dtype
