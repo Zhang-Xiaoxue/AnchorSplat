@@ -1,9 +1,9 @@
 # AnchorSplat
 
-**中文** | [English](README_en.md)
+[中文](README_zh.md) | **English**
 
 **AnchorSplat: Feed-Forward 3D Gaussian Splatting with 3D Geometric Priors**  
-论文 `AnchorSplat_arkiv` 的官方实现。
+Official implementation for the paper in `AnchorSplat_arkiv`.
 
 [[Paper](https://arxiv.org/abs/2604.07053)]
 
@@ -11,22 +11,22 @@
   <img src="readme/teaser.png" alt="AnchorSplat teaser" width="100%">
 </p>
 
-## 简介
+## Overview
 
-AnchorSplat 是一个面向场景级重建的前馈式 3D Gaussian Splatting 框架。它不再为每个像素预测一个 Gaussian，而是利用几何先验生成稀疏 3D anchors，并预测 anchor-aligned Gaussians，从而减少冗余、提升多视角一致性。
+AnchorSplat is a feed-forward 3D Gaussian Splatting framework for scene-level reconstruction. Instead of predicting one Gaussian for each image pixel, it builds sparse 3D anchors from geometric priors and decodes anchor-aligned Gaussians, reducing redundancy while improving view consistency.
 
-本代码主要在 Ascend NPU 上运行和测试。模型基于 PyTorch 实现，可较方便迁移到 GPU；本文档仅保留 NPU 运行流程。
+This code is developed and tested on Ascend NPU. The model is PyTorch-based and can be migrated to GPU with minimal changes; this README keeps only the NPU workflow.
 
-## 文件结构
+## Repository Structure
 
-当前仓库主要路径如下：
+Main repository paths:
 
 ```text
 AnchorSplat/
-  README.md                 # 中文 README
-  README_en.md              # English README
+  README.md                 # English README, shown by default on GitHub
+  README_zh.md              # Chinese README
   LICENSE
-  readme/                   # README 图片资源
+  readme/                   # README figures
     teaser.png
     pipeline.png
     psnr_time.png
@@ -40,24 +40,24 @@ AnchorSplat/
       trainer_mix.py
       dataset_mix.py
       loss.py
-      data/                 # ScanNet++ / ARKitScenes 场景列表
+      data/                 # ScanNet++ / ARKitScenes scene lists
 ```
 
-## 方法流程
+## Pipeline
 
 <p align="center">
   <img src="readme/pipeline.png" alt="AnchorSplat pipeline" width="100%">
 </p>
 
-- **Anchor 预测器**：从多视角图像中预测相机位姿、深度和 3D 几何先验。
-- **Gaussian 解码器**：将多视角特征投影到 anchors 上，并预测 anchor-aligned 3D Gaussians。
-- **Gaussian 精炼器**：利用渲染误差进一步优化 Gaussian 属性，提升重建质量。
+- **Anchor Predictor**: predicts camera poses, depths and 3D geometric priors from multi-view images.
+- **Gaussian Decoder**: projects multi-view features onto anchors and predicts anchor-aligned 3D Gaussians.
+- **Gaussian Refiner**: refines Gaussian attributes with rendering errors for better reconstruction quality.
 
 <p align="center">
   <img src="readme/psnr_time.png" alt="PSNR and reconstruction time" width="72%">
 </p>
 
-## 环境
+## Setup
 
 ```bash
 git clone https://github.com/Zhang-Xiaoxue/AnchorSplat.git
@@ -66,7 +66,7 @@ cd AnchorSplat
 conda create -n anchorsplat python=3.10 -y
 conda activate anchorsplat
 
-# 根据 Ascend CANN 版本安装匹配的 PyTorch、torchvision 和 torch-npu。
+# Install PyTorch, torchvision and torch-npu according to your Ascend CANN version.
 
 pip install addict einops omegaconf opencv-python pillow imageio matplotlib tqdm typer \
   huggingface_hub torchmetrics plyfile trimesh moviepy gradio fastapi uvicorn \
@@ -75,13 +75,13 @@ pip install addict einops omegaconf opencv-python pillow imageio matplotlib tqdm
 export PYTHONPATH=$PWD/src:$PYTHONPATH
 ```
 
-NPU 渲染依赖 Ascend 运行环境和 NPU Gaussian rasterization 算子，包括 `acl` 与 `meta_gauss_render`。
+The NPU renderer depends on the Ascend runtime and the NPU Gaussian rasterization operators, including `acl` and `meta_gauss_render`.
 
-## 数据格式
+## Dataset Format
 
 ### AnchorSplat-style data
 
-用于 ScanNet++ 和 ARKitScenes：
+Used for ScanNet++ and ARKitScenes:
 
 ```text
 scene/
@@ -89,7 +89,7 @@ scene/
   viewInfo.npz
 ```
 
-`viewInfo.npz` 应包含：
+`viewInfo.npz` should include:
 
 ```text
 image_filenames
@@ -97,7 +97,7 @@ T_w2c
 K_norm
 ```
 
-场景列表：
+Scene lists:
 
 ```text
 src/train/data/scannetpp_train.txt
@@ -108,7 +108,7 @@ src/train/data/arkit_val.txt
 
 ### Reliev3R-style data
 
-用于 DL3DV 和 RealEstate10K-style 数据：
+Used for DL3DV and RealEstate10K-style data:
 
 ```text
 sub_xxx/
@@ -117,31 +117,31 @@ sub_xxx/
     scene.npy
 ```
 
-`scene.npy` 为 Python dict，应包含：
+`scene.npy` is a Python dict and should include:
 
 ```text
 intr_mat
 extr_mat
 ```
 
-每个场景建议不少于 `2 * num_views` 张图像；`num_views` 在 `src/depth_anything_3/configs/anchorsplat_mix.yaml` 中配置。
+Each scene is expected to have at least `2 * num_views` images. `num_views` is configured in `src/depth_anything_3/configs/anchorsplat_mix.yaml`.
 
-## 模型权重
+## Model Weights
 
-训练配置默认读取：
+Default training checkpoint path:
 
 ```yaml
 model:
   depth_net: ~/ckpts/DA3-GIANT-1.1
 ```
 
-训练前请修改 `src/depth_anything_3/configs/anchorsplat_mix.yaml` 中的权重和数据路径，或在命令行中覆盖。
+Before training, update checkpoint and dataset paths in `src/depth_anything_3/configs/anchorsplat_mix.yaml`, or override them from the command line.
 
 ## Release Plan
 
-- [ ] 训练权重上传后 release。
+- [ ] Release training checkpoints after upload.
 
-## 训练
+## Train
 
 ```bash
 torchrun --nproc_per_node=<num_npus> src/train/trainer_mix.py \
@@ -149,7 +149,7 @@ torchrun --nproc_per_node=<num_npus> src/train/trainer_mix.py \
   --output outputs/anchorsplat_mix
 ```
 
-## 测试与推理
+## Test & Inference
 
 ```bash
 torchrun --nproc_per_node=<num_npus> src/train/trainer_mix.py \
@@ -159,17 +159,17 @@ torchrun --nproc_per_node=<num_npus> src/train/trainer_mix.py \
   --test
 ```
 
-结果会保存到 `outputs/anchorsplat_mix/test`，包含指标、可视化结果，以及配置中开启后的 Gaussian/video 导出。
+Results are saved under `outputs/anchorsplat_mix/test`, including metrics, visualizations, and optional Gaussian/video exports when enabled in the config.
 
-## 备注
+## Note
 
-代码中保留了用于兼容的 `gsplat` renderer fallback，但本仓库文档按 NPU-first 版本维护。
+The codebase contains a `gsplat` renderer fallback for compatibility, but this repository is documented as an NPU-first release.
 
-## 致谢
+## Acknowledgements
 
-本实现基于 [Depth Anything 3](https://github.com/ByteDance-Seed/Depth-Anything-3) codebase 修改完成，感谢 DA3 作者和社区贡献者开源相关代码。
+This implementation is built by modifying the [Depth Anything 3](https://github.com/ByteDance-Seed/Depth-Anything-3) codebase. We sincerely thank the DA3 authors and contributors for releasing their code.
 
-## 引用
+## Citation
 
 ```bibtex
 @article{zhang2026anchorsplat,
