@@ -9,6 +9,7 @@
 
 <p align="center">
   <img src="readme/teaser.png" alt="AnchorSplat teaser" width="100%">
+  <video src="readme/render.mp4" alt="Rendered video" width="100%">
 </p>
 
 ## 简介
