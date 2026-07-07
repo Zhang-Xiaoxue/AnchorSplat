@@ -7,9 +7,10 @@ Official implementation for the paper in `AnchorSplat_arkiv`.
 
 [[Paper](https://arxiv.org/abs/2604.07053)]
 
+
 <p align="center">
   <img src="readme/teaser.png" alt="AnchorSplat teaser" width="100%">
-  <video src="readme/render.mp4" alt="Rendered video" width="100%">
+  <video src="https://github.com/user-attachments/assets/5a278807-b8be-4238-b74b-4d3de2f3b342" alt="Rendered video" width="100%">
 </p>
 
 ## Overview
